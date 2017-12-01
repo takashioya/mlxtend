@@ -126,7 +126,7 @@ class StackingCVRegressor(BaseEstimator, RegressorMixin, TransformerMixin):
             # cross-validation strategy
             kfold.shuffle = self.shuffle
 
-        meta_features = np.zeros((X.shape[0], len(self.regressors)))
+        self.meta_features = np.zeros((X.shape[0], len(self.regressors)))
 
         #
         # The outer loop iterates over the base-regressors. Each regressor
@@ -148,7 +148,7 @@ class StackingCVRegressor(BaseEstimator, RegressorMixin, TransformerMixin):
                 instance = clone(regr)
                 instance.fit(X[train_idx], y[train_idx])
                 y_pred = instance.predict(X[holdout_idx])
-                meta_features[holdout_idx, i] = y_pred
+                self.meta_features[holdout_idx, i] = y_pred
 
         # save meta-features for training data
         if self.store_train_meta_features:
@@ -156,9 +156,9 @@ class StackingCVRegressor(BaseEstimator, RegressorMixin, TransformerMixin):
 
         # Train meta-model on the out-of-fold predictions
         if self.use_features_in_secondary:
-            self.meta_regr_.fit(np.hstack((X, meta_features)), y)
+            self.meta_regr_.fit(np.hstack((X, self.meta_features)), y)
         else:
-            self.meta_regr_.fit(meta_features, y)
+            self.meta_regr_.fit(self.meta_features, y)
 
         # Retrain base models on all data
         for regr in self.regr_:
@@ -171,14 +171,14 @@ class StackingCVRegressor(BaseEstimator, RegressorMixin, TransformerMixin):
         # First we make predictions with the base-models then we predict with
         # the meta-model from that info.
         #
-        meta_features = np.column_stack([
+        self.pred_meta_features = np.column_stack([
             regr.predict(X) for regr in self.regr_
         ])
 
         if self.use_features_in_secondary:
-            return self.meta_regr_.predict(np.hstack((X, meta_features)))
+            return self.meta_regr_.predict(np.hstack((X, self.pred_meta_features)))
         else:
-            return self.meta_regr_.predict(meta_features)
+            return self.meta_regr_.predict(self.pred_meta_features)
 
     def predict_meta_features(self, X):
         """ Get meta-features of test-data.
